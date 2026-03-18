@@ -1,0 +1,6 @@
+node_modules/
+dist/
+public/templates/*.png
+public/templates/*.jpg
+public/templates/*.jpeg
+public/templates/*.webp
