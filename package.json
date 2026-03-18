@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "concurrently \"vite\" \"node server/index.js\"",
-    "build": "tsc --noEmit false && vite build",
-    "start": "NODE_ENV=production node server/index.js",
+    "build": "vite build",
+    "start": "node server/index.js",
     "preview": "vite preview",
     "server": "node server/index.js"
   },

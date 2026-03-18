@@ -9,7 +9,7 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
 const app = express()
-const PORT = 3001
+const PORT = process.env.PORT || 3001
 
 // Paths
 const PUBLIC_DIR = path.join(__dirname, '..', 'public')
@@ -105,12 +105,19 @@ app.delete('/api/templates/:id', (req, res) => {
 })
 
 // Serve built frontend in production
-if (process.env.NODE_ENV === 'production') {
-  app.use(express.static(path.join(__dirname, '..', 'dist')))
-  app.get('*', (_req, res) => {
-    res.sendFile(path.join(__dirname, '..', 'dist', 'index.html'))
-  })
-}
+// if (process.env.NODE_ENV === 'production') {
+//   app.use(express.static(path.join(__dirname, '..', 'dist')))
+//   app.get('*', (_req, res) => {
+//     res.sendFile(path.join(__dirname, '..', 'dist', 'index.html'))
+//   })
+// }
+
+// Serve built frontend
+const distPath = path.join(__dirname, '..', 'dist')
+app.use(express.static(distPath))
+app.get('*', (_req, res) => {
+  res.sendFile(path.join(distPath, 'index.html'))
+})
 
 app.listen(PORT, () => {
   console.log(`✅ API server running at http://localhost:${PORT}`)
