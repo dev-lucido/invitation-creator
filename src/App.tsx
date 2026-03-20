@@ -1,15 +1,20 @@
-import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Link, useLocation, Navigate } from 'react-router-dom'
 import {
-  AppBar, Toolbar, Typography, Button, Box, Container,
-  CssBaseline, IconButton, Drawer, List, ListItem, ListItemButton,
-  ListItemText, useMediaQuery, useTheme
+  AppBar, Toolbar, Typography, Button, Box, Container, CssBaseline,
+  IconButton, Drawer, List, ListItem, ListItemButton, ListItemText,
+  useMediaQuery, useTheme, Chip
 } from '@mui/material'
 import MenuIcon from '@mui/icons-material/Menu'
 import CloseIcon from '@mui/icons-material/Close'
+import LogoutIcon from '@mui/icons-material/Logout'
+import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings'
+import PersonIcon from '@mui/icons-material/Person'
 import { ThemeProvider, createTheme } from '@mui/material/styles'
 import { useState } from 'react'
+import { AuthProvider, useAuth } from './contexts/AuthContext'
 import AdminPage from './pages/AdminPage'
 import UserPage from './pages/UserPage'
+import LoginPage from './pages/LoginPage'
 
 const theme = createTheme({
   palette: {
@@ -34,16 +39,44 @@ const theme = createTheme({
   },
 })
 
-const NAV_LINKS = [
-  { label: 'Create Invitation', to: '/' },
-  { label: 'Admin', to: '/admin' },
-]
+// ── Route guards ───────────────────────────────────────────────────────────────
+function RequireLogin({ children }: { children: React.ReactNode }) {
+  const { isLoggedIn } = useAuth()
+  const location = useLocation()
+  if (!isLoggedIn) {
+    return <Navigate to="/login" state={{ from: location.pathname }} replace />
+  }
+  return <>{children}</>
+}
 
+function RequireAdmin({ children }: { children: React.ReactNode }) {
+  const { isLoggedIn, isAdmin } = useAuth()
+  const location = useLocation()
+  if (!isLoggedIn) {
+    return <Navigate to="/login" state={{ from: location.pathname }} replace />
+  }
+  if (!isAdmin) {
+    // Logged in but not admin — send them home
+    return <Navigate to="/" replace />
+  }
+  return <>{children}</>
+}
+
+// ── Nav bar ────────────────────────────────────────────────────────────────────
 function NavBar() {
   const loc = useLocation()
+  const { isAdmin, isLoggedIn, user, logout } = useAuth()
   const muiTheme = useTheme()
   const isMobile = useMediaQuery(muiTheme.breakpoints.down('sm'))
   const [drawerOpen, setDrawerOpen] = useState(false)
+
+  const closeDrawer = () => setDrawerOpen(false)
+
+  // Only show nav links when logged in
+  const navLinks = isLoggedIn ? [
+    { label: 'Create Invitation', to: '/' },
+    ...(isAdmin ? [{ label: 'Admin', to: '/admin' }] : []),
+  ] : []
 
   return (
     <AppBar
@@ -51,14 +84,15 @@ function NavBar() {
       elevation={0}
       sx={{ bgcolor: '#1a1a2e', borderBottom: '1px solid rgba(255,255,255,.08)' }}
     >
-      <Toolbar>
+      <Toolbar sx={{ gap: 1 }}>
         <Typography
           variant="h6"
           component={Link}
-          to="/"
+          to={isLoggedIn ? '/' : '/login'}
           sx={{
-            flexGrow: 1, fontWeight: 700, letterSpacing: 1, color: '#fff',
-            textDecoration: 'none', fontSize: { xs: '1rem', sm: '1.25rem' }
+            flexGrow: 1, fontWeight: 700, letterSpacing: 1,
+            color: '#fff', textDecoration: 'none',
+            fontSize: { xs: '1rem', sm: '1.25rem' },
           }}
         >
           ✉ InviteForge
@@ -66,69 +100,153 @@ function NavBar() {
 
         {isMobile ? (
           <>
-            <IconButton onClick={() => setDrawerOpen(true)} sx={{ color: '#fff' }}>
-              <MenuIcon />
-            </IconButton>
-            <Drawer anchor="right" open={drawerOpen} onClose={() => setDrawerOpen(false)}>
-              <Box sx={{ width: 220, pt: 1 }}>
+            {isLoggedIn && (
+              <IconButton onClick={() => setDrawerOpen(true)} sx={{ color: '#fff' }}>
+                <MenuIcon />
+              </IconButton>
+            )}
+            <Drawer anchor="right" open={drawerOpen} onClose={closeDrawer}>
+              <Box sx={{ width: 240, pt: 1 }}>
                 <Box display="flex" justifyContent="flex-end" px={1}>
-                  <IconButton onClick={() => setDrawerOpen(false)}>
-                    <CloseIcon />
-                  </IconButton>
+                  <IconButton onClick={closeDrawer}><CloseIcon /></IconButton>
                 </Box>
+                {/* User info */}
+                {isLoggedIn && (
+                  <Box px={2} pb={1.5}>
+                    <Chip
+                      icon={isAdmin ? <AdminPanelSettingsIcon /> : <PersonIcon />}
+                      label={`${user?.username} (${user?.role})`}
+                      size="small"
+                      color={isAdmin ? 'error' : 'default'}
+                      variant="outlined"
+                    />
+                  </Box>
+                )}
                 <List>
-                  {NAV_LINKS.map(link => (
+                  {navLinks.map(link => (
                     <ListItem key={link.to} disablePadding>
                       <ListItemButton
                         component={Link}
                         to={link.to}
                         selected={loc.pathname === link.to}
-                        onClick={() => setDrawerOpen(false)}
+                        onClick={closeDrawer}
                       >
                         <ListItemText primary={link.label} />
                       </ListItemButton>
                     </ListItem>
                   ))}
+                  {isLoggedIn && (
+                    <ListItem disablePadding>
+                      <ListItemButton onClick={() => { logout(); closeDrawer() }}>
+                        <ListItemText
+                          primary="Sign Out"
+                          primaryTypographyProps={{ color: 'error' }}
+                        />
+                      </ListItemButton>
+                    </ListItem>
+                  )}
                 </List>
               </Box>
             </Drawer>
           </>
         ) : (
-          NAV_LINKS.map(link => (
-            <Button
-              key={link.to}
-              component={Link}
-              to={link.to}
-              sx={{
-                color: loc.pathname === link.to ? '#e94560' : '#ffffffaa',
-                fontWeight: loc.pathname === link.to ? 700 : 400,
-                ml: 1,
-              }}
-            >
-              {link.label}
-            </Button>
-          ))
+          <>
+            {navLinks.map(link => (
+              <Button
+                key={link.to}
+                component={Link}
+                to={link.to}
+                sx={{
+                  color: loc.pathname === link.to ? '#e94560' : '#ffffffaa',
+                  fontWeight: loc.pathname === link.to ? 700 : 400,
+                }}
+              >
+                {link.label}
+              </Button>
+            ))}
+
+            {isLoggedIn ? (
+              <Box display="flex" alignItems="center" gap={1} ml={1}>
+                <Chip
+                  icon={isAdmin
+                    ? <AdminPanelSettingsIcon sx={{ fontSize: '15px !important' }} />
+                    : <PersonIcon sx={{ fontSize: '15px !important' }} />
+                  }
+                  label={user?.username}
+                  size="small"
+                  sx={{
+                    bgcolor: isAdmin ? 'rgba(233,69,96,0.15)' : 'rgba(255,255,255,0.1)',
+                    color: isAdmin ? '#e94560' : '#ffffffcc',
+                    border: `1px solid ${isAdmin ? 'rgba(233,69,96,0.4)' : 'rgba(255,255,255,0.2)'}`,
+                  }}
+                />
+                <Button
+                  onClick={logout}
+                  startIcon={<LogoutIcon />}
+                  size="small"
+                  sx={{ color: '#ffffffaa' }}
+                >
+                  Sign Out
+                </Button>
+              </Box>
+            ) : null}
+          </>
         )}
       </Toolbar>
     </AppBar>
   )
 }
 
+// ── Inner app — needs router context for NavBar (useLocation) ─────────────────
+function InnerApp() {
+  return (
+    <>
+      <NavBar />
+      <Container maxWidth={false} disableGutters>
+        <Box sx={{ minHeight: 'calc(100vh - 64px)', bgcolor: '#fafafa' }}>
+          <Routes>
+            {/* Public — login page */}
+            <Route path="/login" element={<LoginPage />} />
+
+            {/* Protected — any logged-in user */}
+            <Route
+              path="/"
+              element={
+                <RequireLogin>
+                  <UserPage />
+                </RequireLogin>
+              }
+            />
+
+            {/* Protected — admin only */}
+            <Route
+              path="/admin"
+              element={
+                <RequireAdmin>
+                  <AdminPage />
+                </RequireAdmin>
+              }
+            />
+
+            {/* Fallback */}
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </Box>
+      </Container>
+    </>
+  )
+}
+
+// ── Root — providers wrap everything ──────────────────────────────────────────
 export default function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <BrowserRouter>
-        <NavBar />
-        <Container maxWidth={false} disableGutters>
-          <Box sx={{ minHeight: 'calc(100vh - 64px)', bgcolor: '#fafafa' }}>
-            <Routes>
-              <Route path="/" element={<UserPage />} />
-              <Route path="/admin" element={<AdminPage />} />
-            </Routes>
-          </Box>
-        </Container>
-      </BrowserRouter>
+      <AuthProvider>
+        <BrowserRouter>
+          <InnerApp />
+        </BrowserRouter>
+      </AuthProvider>
     </ThemeProvider>
   )
 }

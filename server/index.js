@@ -4,69 +4,134 @@ import multer from 'multer'
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import crypto from 'crypto'
 
 const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
+const __dirname  = path.dirname(__filename)
 
-const app = express()
-const PORT = process.env.PORT || 3001
+const app     = express()
+const PORT    = process.env.PORT || 3001
 const IS_PROD = process.env.NODE_ENV === 'production'
 
+// ── Credentials (set these in Railway environment variables) ───────────────────
+// Admin: can view templates, upload, edit, delete
+const ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'admin'
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123'
+// User: can only view templates and create invitations
+const USER_USERNAME  = process.env.USER_USERNAME  || 'user'
+const USER_PASSWORD  = process.env.USER_PASSWORD  || 'user123'
+
+const JWT_SECRET = process.env.JWT_SECRET || crypto.randomBytes(32).toString('hex')
+
+if (!process.env.JWT_SECRET)   console.warn('  ⚠️  JWT_SECRET not set — sessions reset on restart!')
+if (ADMIN_PASSWORD === 'admin123') console.warn('  ⚠️  Using default ADMIN_PASSWORD — change it in Railway env vars!')
+if (USER_PASSWORD  === 'user123')  console.warn('  ⚠️  Using default USER_PASSWORD  — change it in Railway env vars!')
+
+// ── Simple JWT (no library) ────────────────────────────────────────────────────
+function b64url(str) {
+  return Buffer.from(str).toString('base64')
+    .replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')
+}
+function signToken(payload) {
+  const header = b64url(JSON.stringify({ alg: 'HS256', typ: 'JWT' }))
+  const body   = b64url(JSON.stringify(payload))
+  const sig    = crypto.createHmac('sha256', JWT_SECRET)
+    .update(`${header}.${body}`).digest('base64')
+    .replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')
+  return `${header}.${body}.${sig}`
+}
+function verifyToken(token) {
+  try {
+    const [header, body, sig] = token.split('.')
+    const expected = crypto.createHmac('sha256', JWT_SECRET)
+      .update(`${header}.${body}`).digest('base64')
+      .replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')
+    if (sig !== expected) return null
+    const payload = JSON.parse(Buffer.from(body, 'base64').toString())
+    if (payload.exp && Date.now() > payload.exp) return null
+    return payload
+  } catch { return null }
+}
+
+// ── Auth middleware ────────────────────────────────────────────────────────────
+function requireAuth(req, res, next) {
+  const auth  = req.headers['authorization'] || ''
+  const token = auth.startsWith('Bearer ') ? auth.slice(7) : null
+  if (!token) return res.status(401).json({ error: 'Not logged in' })
+  const payload = verifyToken(token)
+  if (!payload) return res.status(401).json({ error: 'Invalid or expired token' })
+  req.authUser = payload
+  next()
+}
+function requireAdmin(req, res, next) {
+  requireAuth(req, res, () => {
+    if (req.authUser.role !== 'admin')
+      return res.status(403).json({ error: 'Admin access required' })
+    next()
+  })
+}
+
 // ── Paths ──────────────────────────────────────────────────────────────────────
-// In production on Railway, use /tmp for writable storage (dist is read-only)
-const DATA_DIR   = IS_PROD
-  ? path.join('/tmp', 'invitation-data')
-  : path.join(__dirname, '..', 'public')
+const DATA_DIR      = IS_PROD ? '/tmp/invitation-data' : path.join(__dirname, '..', 'public')
+const TEMPLATES_DIR = path.join(DATA_DIR, 'templates')
+const METADATA_FILE = path.join(DATA_DIR, 'templates.json')
+const DIST_DIR      = path.join(__dirname, '..', 'dist')
 
-const TEMPLATES_DIR  = path.join(DATA_DIR, 'templates')
-const METADATA_FILE  = path.join(DATA_DIR, 'templates.json')
-const DIST_DIR       = path.join(__dirname, '..', 'dist')
-
-// Ensure writable directories exist
 if (!fs.existsSync(TEMPLATES_DIR)) fs.mkdirSync(TEMPLATES_DIR, { recursive: true })
 if (!fs.existsSync(METADATA_FILE)) fs.writeFileSync(METADATA_FILE, '[]', 'utf-8')
 
-// ── Startup log ───────────────────────────────────────────────────────────────
+// ── Startup log ────────────────────────────────────────────────────────────────
 console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-console.log(`  InviteForge Server`)
-console.log(`  Mode      : ${IS_PROD ? 'production' : 'development'}`)
-console.log(`  Port      : ${PORT}`)
-console.log(`  Data dir  : ${DATA_DIR}`)
-console.log(`  Dist dir  : ${DIST_DIR}`)
-console.log(`  Dist exists: ${fs.existsSync(DIST_DIR)}`)
+console.log('  InviteForge Server')
+console.log(`  Mode        : ${IS_PROD ? 'production' : 'development'}`)
+console.log(`  Port        : ${PORT}`)
+console.log(`  Data dir    : ${DATA_DIR}`)
+console.log(`  Dist exists : ${fs.existsSync(DIST_DIR)}`)
+console.log(`  Admin user  : ${ADMIN_USERNAME}`)
+console.log(`  User        : ${USER_USERNAME}`)
 console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
 
 // ── Middleware ─────────────────────────────────────────────────────────────────
 app.use(cors())
 app.use(express.json())
-
-// Serve uploaded template images
 app.use('/templates', express.static(TEMPLATES_DIR))
 
-// ── Health check (Railway uses this to confirm the app is up) ─────────────────
+// ── Health check ───────────────────────────────────────────────────────────────
 app.get('/health', (_req, res) => {
-  const distOk = fs.existsSync(DIST_DIR)
-  const dataOk = fs.existsSync(TEMPLATES_DIR)
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
     mode: IS_PROD ? 'production' : 'development',
     port: PORT,
-    dist_exists: distOk,
-    data_dir_exists: dataOk,
+    dist_exists: fs.existsSync(DIST_DIR),
     template_count: readMeta().length,
   })
 })
 
-// ── Multer (file uploads) ──────────────────────────────────────────────────────
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, TEMPLATES_DIR),
-  filename: (_req, file, cb) => {
-    const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}`
-    cb(null, unique + path.extname(file.originalname))
-  },
+// ── Login ──────────────────────────────────────────────────────────────────────
+app.post('/api/login', (req, res) => {
+  const { username, password } = req.body || {}
+  if (!username || !password)
+    return res.status(400).json({ error: 'Username and password required' })
+
+  let role = null
+  if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) role = 'admin'
+  else if (username === USER_USERNAME && password === USER_PASSWORD) role = 'user'
+
+  if (!role) {
+    console.warn(`[auth] Failed login: "${username}"`)
+    return res.status(401).json({ error: 'Invalid username or password' })
+  }
+
+  const token = signToken({
+    role,
+    username,
+    iat: Date.now(),
+    exp: Date.now() + 1000 * 60 * 60 * 24, // 24 hours
+  })
+  console.log(`[auth] Login OK: ${username} (${role})`)
+  res.json({ token, username, role })
 })
-const upload = multer({ storage, limits: { fileSize: 20 * 1024 * 1024 } })
 
 // ── Metadata helpers ───────────────────────────────────────────────────────────
 function readMeta() {
@@ -77,19 +142,30 @@ function writeMeta(data) {
   fs.writeFileSync(METADATA_FILE, JSON.stringify(data, null, 2), 'utf-8')
 }
 
-// ── API routes ─────────────────────────────────────────────────────────────────
-app.get('/api/templates', (_req, res) => {
+// ── Multer ─────────────────────────────────────────────────────────────────────
+const storage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, TEMPLATES_DIR),
+  filename: (_req, file, cb) => {
+    const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}`
+    cb(null, unique + path.extname(file.originalname))
+  },
+})
+const upload = multer({ storage, limits: { fileSize: 20 * 1024 * 1024 } })
+
+// ── Templates API ──────────────────────────────────────────────────────────────
+// GET — any logged-in user
+app.get('/api/templates', requireAuth, (_req, res) => {
   res.json(readMeta())
 })
 
-app.post('/api/templates', upload.single('image'), (req, res) => {
+// POST / PUT / DELETE — admin only
+app.post('/api/templates', requireAdmin, upload.single('image'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No image uploaded' })
   const { name, fields } = req.body
   if (!name) return res.status(400).json({ error: 'Template name required' })
   let parsedFields = []
   try { parsedFields = JSON.parse(fields || '[]') }
   catch { return res.status(400).json({ error: 'Invalid fields JSON' }) }
-
   const template = {
     id: `tpl_${Date.now()}`,
     name,
@@ -101,59 +177,45 @@ app.post('/api/templates', upload.single('image'), (req, res) => {
   const meta = readMeta()
   meta.push(template)
   writeMeta(meta)
-  console.log(`[upload] New template: "${name}" (${req.file.filename})`)
+  console.log(`[upload] "${name}"`)
   res.json(template)
 })
 
-app.put('/api/templates/:id', (req, res) => {
+app.put('/api/templates/:id', requireAdmin, (req, res) => {
   const meta = readMeta()
   const idx = meta.findIndex(t => t.id === req.params.id)
-  if (idx === -1) return res.status(404).json({ error: 'Template not found' })
+  if (idx === -1) return res.status(404).json({ error: 'Not found' })
   const { name, fields } = req.body
   if (name) meta[idx].name = name
   if (fields) meta[idx].fields = fields
   writeMeta(meta)
-  console.log(`[update] Template "${meta[idx].name}"`)
   res.json(meta[idx])
 })
 
-app.delete('/api/templates/:id', (req, res) => {
+app.delete('/api/templates/:id', requireAdmin, (req, res) => {
   const meta = readMeta()
   const idx = meta.findIndex(t => t.id === req.params.id)
-  if (idx === -1) return res.status(404).json({ error: 'Template not found' })
-  const template = meta[idx]
-  const filePath = path.join(TEMPLATES_DIR, template.filename)
+  if (idx === -1) return res.status(404).json({ error: 'Not found' })
+  const { filename } = meta[idx]
+  const filePath = path.join(TEMPLATES_DIR, filename)
   if (fs.existsSync(filePath)) fs.unlinkSync(filePath)
   meta.splice(idx, 1)
   writeMeta(meta)
-  console.log(`[delete] Template "${template.name}"`)
   res.json({ success: true })
 })
 
-// ── Serve React frontend (production only) ─────────────────────────────────────
-// This MUST come after all API routes
+// ── Serve React frontend ───────────────────────────────────────────────────────
 if (IS_PROD && fs.existsSync(DIST_DIR)) {
   app.use(express.static(DIST_DIR))
-  app.get('*', (_req, res) => {
-    res.sendFile(path.join(DIST_DIR, 'index.html'))
-  })
-  console.log('  Serving React frontend from dist/')
+  app.get('*', (_req, res) => res.sendFile(path.join(DIST_DIR, 'index.html')))
 } else if (IS_PROD) {
-  console.warn('  WARNING: dist/ not found — frontend will not be served!')
-  app.get('*', (_req, res) => {
-    res.status(503).send(`
-      <h2>Build output missing</h2>
-      <p>dist/ directory not found at: ${DIST_DIR}</p>
-      <p>Make sure the build command runs before start.</p>
-      <p><a href="/health">/health</a></p>
-    `)
-  })
+  app.get('*', (_req, res) => res.status(503).send(
+    `<h2>Build missing</h2><p>dist/ not found.</p><a href="/health">/health</a>`
+  ))
 }
 
 // ── Start ──────────────────────────────────────────────────────────────────────
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`\n✅ Server listening on 0.0.0.0:${PORT}`)
-  if (IS_PROD) console.log(`   Visit: https://your-app.railway.app`)
-  else         console.log(`   Visit: http://localhost:${PORT}`)
-  console.log(`   Health: http://localhost:${PORT}/health`)
+  console.log(`\n✅ Listening on 0.0.0.0:${PORT}`)
+  console.log(`   Health: http://localhost:${PORT}/health\n`)
 })
