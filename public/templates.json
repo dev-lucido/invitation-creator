@@ -1,1 +1,42 @@
-[]
+[
+  {
+    "id": "tpl_1774292384633",
+    "name": "aaa",
+    "filename": "1774292384626-535796208.webp",
+    "imageUrl": "/templates/1774292384626-535796208.webp",
+    "variants": [
+      {
+        "lang": "English",
+        "filename": "1774292384626-535796208.webp",
+        "imageUrl": "/templates/1774292384626-535796208.webp"
+      },
+      {
+        "lang": "Sinhala",
+        "filename": "1774292384627-252118432.webp",
+        "imageUrl": "/templates/1774292384627-252118432.webp"
+      },
+      {
+        "lang": "Tamil",
+        "filename": "1774292384628-910890356.webp",
+        "imageUrl": "/templates/1774292384628-910890356.webp"
+      }
+    ],
+    "fields": [
+      {
+        "id": "f_1774292351995",
+        "label": "New Field",
+        "key": "field_1774292351995",
+        "x": 51,
+        "y": 5.5,
+        "fontSize": 32,
+        "fontFamily": "Georgia",
+        "color": "#2eb309",
+        "align": "center",
+        "bold": true,
+        "italic": false,
+        "maxWidth": 80
+      }
+    ],
+    "createdAt": "2026-03-23T18:59:44.633Z"
+  }
+]

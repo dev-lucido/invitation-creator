@@ -2,7 +2,7 @@ import { BrowserRouter, Routes, Route, Link, useLocation, Navigate } from 'react
 import {
   AppBar, Toolbar, Typography, Button, Box, Container, CssBaseline,
   IconButton, Drawer, List, ListItem, ListItemButton, ListItemText,
-  useMediaQuery, useTheme, Chip
+  useMediaQuery, useTheme, Chip, Avatar
 } from '@mui/material'
 import MenuIcon from '@mui/icons-material/Menu'
 import CloseIcon from '@mui/icons-material/Close'
@@ -39,64 +39,74 @@ const theme = createTheme({
   },
 })
 
-// ── Route guards ───────────────────────────────────────────────────────────────
 function RequireLogin({ children }: { children: React.ReactNode }) {
   const { isLoggedIn } = useAuth()
   const location = useLocation()
-  if (!isLoggedIn) {
-    return <Navigate to="/login" state={{ from: location.pathname }} replace />
-  }
+  if (!isLoggedIn) return <Navigate to="/login" state={{ from: location.pathname }} replace />
   return <>{children}</>
 }
 
 function RequireAdmin({ children }: { children: React.ReactNode }) {
   const { isLoggedIn, isAdmin } = useAuth()
   const location = useLocation()
-  if (!isLoggedIn) {
-    return <Navigate to="/login" state={{ from: location.pathname }} replace />
-  }
-  if (!isAdmin) {
-    // Logged in but not admin — send them home
-    return <Navigate to="/" replace />
-  }
+  if (!isLoggedIn) return <Navigate to="/login" state={{ from: location.pathname }} replace />
+  if (!isAdmin) return <Navigate to="/" replace />
   return <>{children}</>
 }
 
-// ── Nav bar ────────────────────────────────────────────────────────────────────
+// ── Logo component — put your logo image in public/logo.png ───────────────────
+function Logo() {
+  return (
+    <Box
+      component={Link}
+      to="/"
+      sx={{ display: 'flex', alignItems: 'center', gap: 1.5, textDecoration: 'none', flexGrow: 1 }}
+    >
+      <Avatar
+        src="/logo.jpg"
+        alt="InviteForge"
+        variant="rounded"
+        sx={{
+          width: 200, height: 34,
+          // bgcolor: 'rgba(255,255,255,0.1)',
+          fontSize: 18,
+          // Show ✉ emoji as fallback if logo.png doesn't exist
+          '& img': { objectFit: 'contain' },
+        }}
+      >
+        ✉
+      </Avatar>
+      <Typography
+        variant="h6"
+        sx={{
+          fontWeight: 700, letterSpacing: 0.5, color: '#fff',
+          fontSize: { xs: '1rem', sm: '1.2rem' },
+        }}
+      >
+        InviteForge
+      </Typography>
+    </Box>
+  )
+}
+
 function NavBar() {
   const loc = useLocation()
   const { isAdmin, isLoggedIn, user, logout } = useAuth()
   const muiTheme = useTheme()
   const isMobile = useMediaQuery(muiTheme.breakpoints.down('sm'))
   const [drawerOpen, setDrawerOpen] = useState(false)
-
   const closeDrawer = () => setDrawerOpen(false)
 
-  // Only show nav links when logged in
   const navLinks = isLoggedIn ? [
     { label: 'Create Invitation', to: '/' },
     ...(isAdmin ? [{ label: 'Admin', to: '/admin' }] : []),
   ] : []
 
   return (
-    <AppBar
-      position="sticky"
-      elevation={0}
-      sx={{ bgcolor: '#1a1a2e', borderBottom: '1px solid rgba(255,255,255,.08)' }}
-    >
+    <AppBar position="sticky" elevation={0}
+      sx={{ bgcolor: '#1a1a2e', borderBottom: '1px solid rgba(255,255,255,.08)' }}>
       <Toolbar sx={{ gap: 1 }}>
-        <Typography
-          variant="h6"
-          component={Link}
-          to={isLoggedIn ? '/' : '/login'}
-          sx={{
-            flexGrow: 1, fontWeight: 700, letterSpacing: 1,
-            color: '#fff', textDecoration: 'none',
-            fontSize: { xs: '1rem', sm: '1.25rem' },
-          }}
-        >
-          ✉ InviteForge
-        </Typography>
+        <Logo />
 
         {isMobile ? (
           <>
@@ -110,27 +120,20 @@ function NavBar() {
                 <Box display="flex" justifyContent="flex-end" px={1}>
                   <IconButton onClick={closeDrawer}><CloseIcon /></IconButton>
                 </Box>
-                {/* User info */}
                 {isLoggedIn && (
                   <Box px={2} pb={1.5}>
                     <Chip
                       icon={isAdmin ? <AdminPanelSettingsIcon /> : <PersonIcon />}
                       label={`${user?.username} (${user?.role})`}
-                      size="small"
-                      color={isAdmin ? 'error' : 'default'}
-                      variant="outlined"
+                      size="small" color={isAdmin ? 'error' : 'default'} variant="outlined"
                     />
                   </Box>
                 )}
                 <List>
                   {navLinks.map(link => (
                     <ListItem key={link.to} disablePadding>
-                      <ListItemButton
-                        component={Link}
-                        to={link.to}
-                        selected={loc.pathname === link.to}
-                        onClick={closeDrawer}
-                      >
+                      <ListItemButton component={Link} to={link.to}
+                        selected={loc.pathname === link.to} onClick={closeDrawer}>
                         <ListItemText primary={link.label} />
                       </ListItemButton>
                     </ListItem>
@@ -138,10 +141,7 @@ function NavBar() {
                   {isLoggedIn && (
                     <ListItem disablePadding>
                       <ListItemButton onClick={() => { logout(); closeDrawer() }}>
-                        <ListItemText
-                          primary="Sign Out"
-                          primaryTypographyProps={{ color: 'error' }}
-                        />
+                        <ListItemText primary="Sign Out" primaryTypographyProps={{ color: 'error' }} />
                       </ListItemButton>
                     </ListItem>
                   )}
@@ -152,44 +152,31 @@ function NavBar() {
         ) : (
           <>
             {navLinks.map(link => (
-              <Button
-                key={link.to}
-                component={Link}
-                to={link.to}
-                sx={{
-                  color: loc.pathname === link.to ? '#e94560' : '#ffffffaa',
-                  fontWeight: loc.pathname === link.to ? 700 : 400,
-                }}
-              >
+              <Button key={link.to} component={Link} to={link.to} sx={{
+                color: loc.pathname === link.to ? '#e94560' : '#ffffffaa',
+                fontWeight: loc.pathname === link.to ? 700 : 400,
+              }}>
                 {link.label}
               </Button>
             ))}
-
-            {isLoggedIn ? (
+            {isLoggedIn && (
               <Box display="flex" alignItems="center" gap={1} ml={1}>
                 <Chip
                   icon={isAdmin
                     ? <AdminPanelSettingsIcon sx={{ fontSize: '15px !important' }} />
-                    : <PersonIcon sx={{ fontSize: '15px !important' }} />
-                  }
-                  label={user?.username}
-                  size="small"
+                    : <PersonIcon sx={{ fontSize: '15px !important' }} />}
+                  label={user?.username} size="small"
                   sx={{
                     bgcolor: isAdmin ? 'rgba(233,69,96,0.15)' : 'rgba(255,255,255,0.1)',
                     color: isAdmin ? '#e94560' : '#ffffffcc',
                     border: `1px solid ${isAdmin ? 'rgba(233,69,96,0.4)' : 'rgba(255,255,255,0.2)'}`,
                   }}
                 />
-                <Button
-                  onClick={logout}
-                  startIcon={<LogoutIcon />}
-                  size="small"
-                  sx={{ color: '#ffffffaa' }}
-                >
+                <Button onClick={logout} startIcon={<LogoutIcon />} size="small" sx={{ color: '#ffffffaa' }}>
                   Sign Out
                 </Button>
               </Box>
-            ) : null}
+            )}
           </>
         )}
       </Toolbar>
@@ -197,7 +184,6 @@ function NavBar() {
   )
 }
 
-// ── Inner app — needs router context for NavBar (useLocation) ─────────────────
 function InnerApp() {
   return (
     <>
@@ -205,30 +191,9 @@ function InnerApp() {
       <Container maxWidth={false} disableGutters>
         <Box sx={{ minHeight: 'calc(100vh - 64px)', bgcolor: '#fafafa' }}>
           <Routes>
-            {/* Public — login page */}
             <Route path="/login" element={<LoginPage />} />
-
-            {/* Protected — any logged-in user */}
-            <Route
-              path="/"
-              element={
-                <RequireLogin>
-                  <UserPage />
-                </RequireLogin>
-              }
-            />
-
-            {/* Protected — admin only */}
-            <Route
-              path="/admin"
-              element={
-                <RequireAdmin>
-                  <AdminPage />
-                </RequireAdmin>
-              }
-            />
-
-            {/* Fallback */}
+            <Route path="/" element={<RequireLogin><UserPage /></RequireLogin>} />
+            <Route path="/admin" element={<RequireAdmin><AdminPage /></RequireAdmin>} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Box>
@@ -237,7 +202,6 @@ function InnerApp() {
   )
 }
 
-// ── Root — providers wrap everything ──────────────────────────────────────────
 export default function App() {
   return (
     <ThemeProvider theme={theme}>

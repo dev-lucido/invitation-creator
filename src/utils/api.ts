@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { Template, TextField } from '../types'
+import { Template, TextField, Language } from '../types'
 
 const BASE = '/api'
 
@@ -17,21 +17,32 @@ export const fetchTemplates = (): Promise<Template[]> =>
 
 export const uploadTemplate = (
   name: string,
-  image: File,
+  langImages: Partial<Record<Language, File>>,
   fields: TextField[]
 ): Promise<Template> => {
   const form = new FormData()
   form.append('name', name)
-  form.append('image', image)
   form.append('fields', JSON.stringify(fields))
+  for (const [lang, file] of Object.entries(langImages)) {
+    if (file) form.append(`image_${lang}`, file)
+  }
   return axios.post(`${BASE}/templates`, form, { headers: authHeaders() }).then(r => r.data)
 }
 
 export const updateTemplate = (
   id: string,
-  data: { name?: string; fields?: TextField[] }
-): Promise<Template> =>
-  axios.put(`${BASE}/templates/${id}`, data, { headers: authHeaders() }).then(r => r.data)
+  data: { name?: string; fields?: TextField[]; langImages?: Partial<Record<Language, File>> }
+): Promise<Template> => {
+  const form = new FormData()
+  if (data.name) form.append('name', data.name)
+  if (data.fields) form.append('fields', JSON.stringify(data.fields))
+  if (data.langImages) {
+    for (const [lang, file] of Object.entries(data.langImages)) {
+      if (file) form.append(`image_${lang}`, file)
+    }
+  }
+  return axios.put(`${BASE}/templates/${id}`, form, { headers: authHeaders() }).then(r => r.data)
+}
 
 export const deleteTemplate = (id: string): Promise<void> =>
   axios.delete(`${BASE}/templates/${id}`, { headers: authHeaders() }).then(r => r.data)
