@@ -67,14 +67,14 @@ export default function LoginPage() {
           <Box
             sx={{
               width: 52, height: 52, borderRadius: '50%',
-              bgcolor: '#1a1a2e',
+              bgcolor: '#0084cb',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               mb: 2,
             }}
           >
             <LockOutlinedIcon sx={{ color: '#fff', fontSize: 24 }} />
           </Box>
-          <Typography variant="h5" fontWeight={700}>Welcome to InviteForge</Typography>
+          <Typography variant="h5" fontWeight={700}>Welcome to SDB E - Greetings</Typography>
           <Typography variant="body2" color="text.secondary" mt={0.5} textAlign="center">
             Sign in to create and download invitations
           </Typography>

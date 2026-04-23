@@ -1,4 +1,4 @@
-# InviteForge — Invitation Creator
+# SDB E - Greetings — Invitation Creator
 
 A full-stack web app built with **React + TypeScript + Vite** on the frontend and **Express.js** on the backend. Admins upload template images and define text field positions; users pick a template, fill in details, and download a personalized invitation image.
 

@@ -18,7 +18,7 @@ import LoginPage from './pages/LoginPage'
 
 const theme = createTheme({
   palette: {
-    primary: { main: '#1a1a2e' },
+    primary: { main: '#0084cb' },
     secondary: { main: '#e94560' },
   },
   typography: {
@@ -64,7 +64,7 @@ function Logo() {
     >
       <Avatar
         src="/logo.jpg"
-        alt="InviteForge"
+        alt="SDB E - Greetings"
         variant="rounded"
         sx={{
           width: 200, height: 34,
@@ -83,7 +83,7 @@ function Logo() {
           fontSize: { xs: '1rem', sm: '1.2rem' },
         }}
       >
-        InviteForge
+        SDB E - Greetings
       </Typography>
     </Box>
   )
@@ -99,12 +99,12 @@ function NavBar() {
 
   const navLinks = isLoggedIn ? [
     { label: 'Create Invitation', to: '/' },
-    ...(isAdmin ? [{ label: 'Admin', to: '/admin' }] : []),
+    ...(isAdmin ? [{ label: 'Template Manager', to: '/admin' }] : []),
   ] : []
 
   return (
     <AppBar position="sticky" elevation={0}
-      sx={{ bgcolor: '#1a1a2e', borderBottom: '1px solid rgba(255,255,255,.08)' }}>
+      sx={{ bgcolor: '#0084cb', borderBottom: '1px solid rgba(255,255,255,.08)' }}>
       <Toolbar sx={{ gap: 1 }}>
         <Logo />
 

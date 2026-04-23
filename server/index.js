@@ -74,7 +74,7 @@ if (!fs.existsSync(TEMPLATES_DIR)) fs.mkdirSync(TEMPLATES_DIR, { recursive: true
 if (!fs.existsSync(METADATA_FILE)) fs.writeFileSync(METADATA_FILE, '[]', 'utf-8')
 
 console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-console.log('  InviteForge Server')
+console.log('  SDB E - Greetings Server')
 console.log(`  Mode        : ${IS_PROD ? 'production' : 'development'}`)
 console.log(`  Port        : ${PORT}`)
 console.log(`  Dist exists : ${fs.existsSync(DIST_DIR)}`)

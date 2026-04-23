@@ -282,7 +282,7 @@ export default function AdminPage() {
   return (
     <Box sx={{ p: { xs: 2, sm: 3, md: 4 }, maxWidth: 1400, mx: 'auto' }}>
       <Typography variant="h4" fontWeight={800} gutterBottom sx={{ fontSize: { xs: '1.5rem', md: '2.125rem' } }}>
-        Admin — Template Manager
+        Template Manager
       </Typography>
       <Typography variant="body2" color="text.secondary" mb={3}>
         Upload invitation templates with per-language images and text field positions.
