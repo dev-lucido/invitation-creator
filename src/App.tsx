@@ -1,3 +1,5 @@
+// src/App.tsx
+
 import { BrowserRouter, Routes, Route, Link, useLocation, Navigate } from 'react-router-dom'
 import {
   AppBar, Toolbar, Typography, Button, Box, Container, CssBaseline,

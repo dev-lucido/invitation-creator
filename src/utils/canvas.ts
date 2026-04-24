@@ -1,3 +1,5 @@
+// src/utils/canvas.ts
+
 import { Template, FieldValues } from '../types'
 
 export async function renderInvitation(

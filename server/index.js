@@ -1,3 +1,5 @@
+// server/index.js
+
 import express from 'express'
 import cors from 'cors'
 import multer from 'multer'
@@ -5,6 +7,7 @@ import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import crypto from 'crypto'
+import { server } from 'typescript'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname  = path.dirname(__filename)
@@ -136,14 +139,6 @@ app.get('/api/templates', requireAuth, (_req, res) => res.json(readMeta()))
 app.post('/api/templates', requireAdmin, langFields, (req, res) => {
   const files = req.files || {}
   const langs = ['English', 'Sinhala', 'Tamil']
-  const variants = []
-
-  for (const lang of langs) {
-    const f = files[`image_${lang}`]?.[0]
-    if (f) variants.push({ lang, filename: f.filename, imageUrl: `/templates/${f.filename}` })
-  }
-
-  if (variants.length === 0) return res.status(400).json({ error: 'At least one image required' })
 
   const { name, fields } = req.body
   if (!name) return res.status(400).json({ error: 'Template name required' })
@@ -152,7 +147,30 @@ app.post('/api/templates', requireAdmin, langFields, (req, res) => {
   try { parsedFields = JSON.parse(fields || '[]') }
   catch { return res.status(400).json({ error: 'Invalid fields JSON' }) }
 
-  // Use first uploaded image as the legacy default
+  // Parse per-language fields
+  const langFieldsMap = {}
+  for (const lang of langs) {
+    const raw = req.body[`fields_${lang}`]
+    if (raw) {
+      try { langFieldsMap[lang] = JSON.parse(raw) } catch {}
+    }
+  }
+
+  // Build variants (one pass, no duplicates)
+  const variants = []
+  const seenLangs = new Set()
+  for (const lang of langs) {
+    const f = files[`image_${lang}`]?.[0]
+    if (f && !seenLangs.has(lang)) {
+      seenLangs.add(lang)
+      const variant = { lang, filename: f.filename, imageUrl: `/templates/${f.filename}` }
+      if (langFieldsMap[lang]) variant.fields = langFieldsMap[lang]
+      variants.push(variant)
+    }
+  }
+
+  if (variants.length === 0) return res.status(400).json({ error: 'At least one image required' })
+
   const first = variants[0]
   const template = {
     id: `tpl_${Date.now()}`,
@@ -163,10 +181,11 @@ app.post('/api/templates', requireAdmin, langFields, (req, res) => {
     fields: parsedFields,
     createdAt: new Date().toISOString(),
   }
+
   const meta = readMeta()
   meta.push(template)
   writeMeta(meta)
-  console.log(`[upload] "${name}" — variants: ${variants.map(v=>v.lang).join(', ')}`)
+  console.log(`[upload] "${name}" — variants: ${variants.map(v => v.lang).join(', ')}`)
   res.json(template)
 })
 
@@ -182,28 +201,42 @@ app.put('/api/templates/:id', requireAdmin, langFields, (req, res) => {
     catch { return res.status(400).json({ error: 'Invalid fields JSON' }) }
   }
 
-  // Merge in any newly uploaded language images
   const files = req.files || {}
   const langs = ['English', 'Sinhala', 'Tamil']
   if (!meta[idx].variants) meta[idx].variants = []
 
+  // Dedup existing variants first (fixes any bad historical data)
+  const seenLangs = new Set()
+  meta[idx].variants = meta[idx].variants.filter(v => {
+    if (seenLangs.has(v.lang)) return false
+    seenLangs.add(v.lang)
+    return true
+  })
+
   for (const lang of langs) {
     const f = files[`image_${lang}`]?.[0]
+    const rawFields = req.body[`fields_${lang}`]
+    const existingIdx = meta[idx].variants.findIndex(v => v.lang === lang)
+
     if (f) {
       const newVariant = { lang, filename: f.filename, imageUrl: `/templates/${f.filename}` }
-      const existing = meta[idx].variants.findIndex(v => v.lang === lang)
-      if (existing >= 0) {
-        // Delete old file
-        const old = path.join(TEMPLATES_DIR, meta[idx].variants[existing].filename)
+      if (rawFields) {
+        try { newVariant.fields = JSON.parse(rawFields) } catch {}
+      } else if (existingIdx >= 0 && meta[idx].variants[existingIdx].fields) {
+        newVariant.fields = meta[idx].variants[existingIdx].fields
+      }
+      if (existingIdx >= 0) {
+        const old = path.join(TEMPLATES_DIR, meta[idx].variants[existingIdx].filename)
         if (fs.existsSync(old)) fs.unlinkSync(old)
-        meta[idx].variants[existing] = newVariant
+        meta[idx].variants[existingIdx] = newVariant
       } else {
         meta[idx].variants.push(newVariant)
       }
+    } else if (rawFields && existingIdx >= 0) {
+      try { meta[idx].variants[existingIdx].fields = JSON.parse(rawFields) } catch {}
     }
   }
 
-  // Keep legacy imageUrl in sync with first variant
   if (meta[idx].variants.length > 0) {
     meta[idx].filename = meta[idx].variants[0].filename
     meta[idx].imageUrl = meta[idx].variants[0].imageUrl

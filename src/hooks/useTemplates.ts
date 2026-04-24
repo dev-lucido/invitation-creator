@@ -1,3 +1,5 @@
+// src/hooks/useTemplates.ts
+
 import { useState, useEffect, useCallback } from 'react'
 import { Template } from '../types'
 import { fetchTemplates, deleteTemplate } from '../utils/api'

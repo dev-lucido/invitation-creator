@@ -1,3 +1,5 @@
+// src/contexts/AuthContext.tsx
+
 import { createContext, useContext, useState, useCallback, ReactNode } from 'react'
 
 export type UserRole = 'admin' | 'user'

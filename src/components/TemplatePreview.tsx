@@ -1,3 +1,5 @@
+// src/components/TemplatePreview.tsx
+
 import { useEffect, useState, useRef } from 'react'
 import { Box } from '@mui/material'
 import { Template, FieldValues } from '../types'

@@ -1,14 +1,16 @@
+// src/pages/AdminPage.tsx
+
 import { useState, useRef } from 'react'
 import {
   Box, Button, TextField, Typography, Paper, Grid, CircularProgress,
-  Alert, IconButton, Stack, Snackbar, Chip, Divider, useTheme, useMediaQuery
+  Alert, IconButton, Stack, Snackbar, Chip, Divider, useTheme, useMediaQuery, Tabs, Tab
 } from '@mui/material'
 import DeleteIcon from '@mui/icons-material/Delete'
 import EditIcon from '@mui/icons-material/Edit'
 import CloudUploadIcon from '@mui/icons-material/CloudUpload'
 import AddPhotoAlternateIcon from '@mui/icons-material/AddPhotoAlternate'
 import CloseIcon from '@mui/icons-material/Close'
-import { Template, Language, LANGUAGES, getVariantUrl } from '../types'
+import { Template, Language, LANGUAGES, TextField as TF } from '../types'
 import { uploadTemplate, updateTemplate } from '../utils/api'
 import { useTemplates } from '../hooks/useTemplates'
 import FieldEditor from '../components/FieldEditor'
@@ -16,32 +18,27 @@ import TemplatePreview from '../components/TemplatePreview'
 
 const FLAG: Record<Language, string> = { English: '🇬🇧', Sinhala: '🇱🇰', Tamil: '🇮🇳' }
 
-function makeFakeTemplate(name: string, imageUrl: string, fields: Template['fields']): Template {
+function makeFakeTemplate(name: string, imageUrl: string, fields: TF[]): Template {
   return { id: '__preview__', name: name || 'Preview', filename: '', imageUrl, variants: [], fields, createdAt: '' }
 }
 
-// ── Per-language image uploader ────────────────────────────────────────────────
+// ── Per-language image uploader (unchanged) ────────────────────────────────────
 interface LangImagesProps {
   langFiles: Partial<Record<Language, File>>
   langPreviews: Partial<Record<Language, string>>
   onChange: (lang: Language, file: File, previewUrl: string) => void
+  idPrefix?: string   // ← add this
 }
 
-function LangImageUploader({ langFiles, langPreviews, onChange }: LangImagesProps) {
-  const refs = useRef<Record<Language, HTMLInputElement | null>>({} as any)
-
+function LangImageUploader({ langFiles, langPreviews, onChange, idPrefix = 'img' }: LangImagesProps) {
   const handleFile = (lang: Language, e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]
     if (!f) return
-    const url = URL.createObjectURL(f)
-    onChange(lang, f, url)
+    onChange(lang, f, URL.createObjectURL(f))
   }
-
   return (
     <Box>
-      <Typography variant="subtitle2" fontWeight={700} gutterBottom>
-        Images per Language
-      </Typography>
+      <Typography variant="subtitle2" fontWeight={700} gutterBottom>Images per Language</Typography>
       <Typography variant="caption" color="text.secondary" display="block" mb={1.5}>
         Upload a separate image for each language. At least one is required.
       </Typography>
@@ -49,16 +46,10 @@ function LangImageUploader({ langFiles, langPreviews, onChange }: LangImagesProp
         {LANGUAGES.map(lang => (
           <Grid item xs={12} sm={4} key={lang}>
             <Paper variant="outlined" sx={{ p: 1.5, textAlign: 'center' }}>
-              <Typography variant="caption" fontWeight={700} display="block" mb={1}>
-                {FLAG[lang]} {lang}
-              </Typography>
+              <Typography variant="caption" fontWeight={700} display="block" mb={1}>{FLAG[lang]} {lang}</Typography>
               {langPreviews[lang] ? (
-                <Box
-                  component="img"
-                  src={langPreviews[lang]}
-                  alt={lang}
-                  sx={{ width: '100%', height: 80, objectFit: 'cover', borderRadius: 1, display: 'block', mb: 1 }}
-                />
+                <Box component="img" src={langPreviews[lang]} alt={lang}
+                  sx={{ width: '100%', height: 80, objectFit: 'cover', borderRadius: 1, display: 'block', mb: 1 }} />
               ) : (
                 <Box sx={{ width: '100%', height: 80, bgcolor: '#f5f5f5', borderRadius: 1, mb: 1,
                   display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -66,12 +57,11 @@ function LangImageUploader({ langFiles, langPreviews, onChange }: LangImagesProp
                 </Box>
               )}
               <input
-                ref={el => refs.current[lang] = el}
                 type="file" accept="image/*" style={{ display: 'none' }}
-                id={`img-${lang}`}
+                id={`${idPrefix}-${lang}`}          // ← use prefixed id
                 onChange={e => handleFile(lang, e)}
               />
-              <label htmlFor={`img-${lang}`}>
+              <label htmlFor={`${idPrefix}-${lang}`}>   {/* ← match */}
                 <Button variant="outlined" component="span" size="small"
                   startIcon={<AddPhotoAlternateIcon />} fullWidth>
                   {langFiles[lang] ? 'Change' : 'Upload'}
@@ -85,28 +75,90 @@ function LangImageUploader({ langFiles, langPreviews, onChange }: LangImagesProp
   )
 }
 
-// ── Editor panel: preview left, fields + lang images right ────────────────────
+// ── Per-language field tabs ────────────────────────────────────────────────────
+interface LangFieldEditorProps {
+  availableLangs: Language[]    // languages that have an image
+  langFields: Partial<Record<Language, TF[]>>
+  onChange: (lang: Language, fields: TF[]) => void
+}
+
+function LangFieldEditor({ availableLangs, langFields, onChange }: LangFieldEditorProps) {
+  const [activeTab, setActiveTab] = useState(0)
+
+  // Clamp activeTab if availableLangs shrinks
+  const safeTab = Math.min(activeTab, Math.max(0, availableLangs.length - 1))
+  const activeLang = availableLangs[safeTab]
+
+  if (availableLangs.length === 0) {
+    return (
+      <Typography variant="body2" color="text.secondary" align="center" py={2}>
+        Upload at least one language image to configure fields.
+      </Typography>
+    )
+  }
+
+  return (
+    <Box>
+      <Typography variant="subtitle1" fontWeight={700} gutterBottom>Text Fields</Typography>
+      <Typography variant="caption" color="text.secondary" display="block" mb={1}>
+        Each language can have independent field positions and styles.
+      </Typography>
+      <Tabs
+        value={safeTab}                              // ← use safeTab, not activeTab
+        onChange={(_, v) => setActiveTab(v)}
+        sx={{ mb: 2, borderBottom: 1, borderColor: 'divider' }}
+        variant="scrollable"
+        scrollButtons="auto"
+      >
+        {availableLangs.map((lang, i) => (
+          <Tab
+            key={lang}
+            label={`${FLAG[lang]} ${lang}`}
+            value={i}
+            sx={{ minWidth: 100 }}
+          />
+        ))}
+      </Tabs>
+      {/* Key on activeLang forces FieldEditor to fully remount when language switches,
+          so its internal `expanded` state doesn't bleed across languages */}
+      <FieldEditor
+        key={activeLang}
+        fields={langFields[activeLang] ?? []}
+        onChange={fields => onChange(activeLang, fields)}
+        imageWidth={800}
+        imageHeight={600}
+      />
+    </Box>
+  )
+}
+
+// ── Editor panel ───────────────────────────────────────────────────────────────
 interface EditorPanelProps {
   previewImageUrl: string
   templateName: string
   onNameChange: (v: string) => void
-  fields: Template['fields']
-  onFieldsChange: (f: Template['fields']) => void
+  langFields: Partial<Record<Language, TF[]>>
+  onLangFieldsChange: (lang: Language, fields: TF[]) => void
+  availableLangs: Language[]
+  activePreviewLang: Language | null
+  onPreviewLang: (l: Language) => void
   langFiles: Partial<Record<Language, File>>
   langPreviews: Partial<Record<Language, string>>
   onLangImage: (lang: Language, file: File, url: string) => void
   actions: React.ReactNode
   error?: string | null
-  previewLang: Language | null
-  onPreviewLang: (l: Language) => void
 }
 
 function EditorPanel({
-  previewImageUrl, templateName, onNameChange, fields, onFieldsChange,
-  langFiles, langPreviews, onLangImage, actions, error, previewLang, onPreviewLang
+  previewImageUrl, templateName, onNameChange,
+  langFields, onLangFieldsChange, availableLangs,
+  activePreviewLang, onPreviewLang,
+  langFiles, langPreviews, onLangImage,
+  actions, error,
 }: EditorPanelProps) {
-  const fakeTemplate = makeFakeTemplate(templateName, previewImageUrl, fields)
-  const isMobile = useMediaQuery(useTheme().breakpoints.down('md'))
+  // Build a fake template for the preview using the active language's fields
+  const previewFields = (activePreviewLang && langFields[activePreviewLang]) ?? []
+  const fakeTemplate = makeFakeTemplate(templateName, previewImageUrl, previewFields)
 
   return (
     <Grid container spacing={0} sx={{ minHeight: 0 }}>
@@ -123,13 +175,12 @@ function EditorPanel({
             letterSpacing={0.5} textTransform="uppercase">
             Live Preview
           </Typography>
-          {/* Language switcher for preview */}
           <Stack direction="row" spacing={0.5}>
-            {LANGUAGES.filter(l => langPreviews[l]).map(l => (
+            {availableLangs.map(l => (
               <Chip key={l} label={`${FLAG[l]} ${l}`} size="small"
                 onClick={() => onPreviewLang(l)}
-                color={previewLang === l ? 'primary' : 'default'}
-                variant={previewLang === l ? 'filled' : 'outlined'}
+                color={activePreviewLang === l ? 'primary' : 'default'}
+                variant={activePreviewLang === l ? 'filled' : 'outlined'}
                 sx={{ cursor: 'pointer' }} />
             ))}
           </Stack>
@@ -146,11 +197,15 @@ function EditorPanel({
           onChange={e => onNameChange(e.target.value)} fullWidth size="small"
           placeholder="e.g. Wedding Invite 2024" />
 
-        <LangImageUploader langFiles={langFiles} langPreviews={langPreviews} onChange={onLangImage} />
+        <LangImageUploader  idPrefix="edit-img" langFiles={langFiles} langPreviews={langPreviews} onChange={onLangImage} />
 
         <Divider />
 
-        <FieldEditor fields={fields} onChange={onFieldsChange} imageWidth={800} imageHeight={600} />
+        <LangFieldEditor
+          availableLangs={availableLangs}
+          langFields={langFields}
+          onChange={onLangFieldsChange}
+        />
 
         {error && <Alert severity="error">{error}</Alert>}
         <Box pt={1}>{actions}</Box>
@@ -165,34 +220,41 @@ export default function AdminPage() {
   const isMobile = useMediaQuery(useTheme().breakpoints.down('md'))
 
   // Upload state
-  const [uploading, setUploading] = useState(false)
-  const [uploadErr, setUploadErr] = useState<string | null>(null)
-  const [snack, setSnack] = useState('')
-  const [name, setName] = useState('')
-  const [fields, setFields] = useState<Template['fields']>([])
-  const [langFiles, setLangFiles] = useState<Partial<Record<Language, File>>>({})
+  const [uploading, setUploading]       = useState(false)
+  const [uploadErr, setUploadErr]       = useState<string | null>(null)
+  const [snack, setSnack]               = useState('')
+  const [name, setName]                 = useState('')
+  const [langFiles, setLangFiles]       = useState<Partial<Record<Language, File>>>({})
   const [langPreviews, setLangPreviews] = useState<Partial<Record<Language, string>>>({})
-  const [previewLang, setPreviewLang] = useState<Language | null>(null)
+  const [langFields, setLangFields]     = useState<Partial<Record<Language, TF[]>>>({})
+  const [previewLang, setPreviewLang]   = useState<Language | null>(null)
 
   // Edit state
-  const [editing, setEditing] = useState<Template | null>(null)
-  const [editFields, setEditFields] = useState<Template['fields']>([])
-  const [editName, setEditName] = useState('')
-  const [saving, setSaving] = useState(false)
-  const [editLangFiles, setEditLangFiles] = useState<Partial<Record<Language, File>>>({})
+  const [editing, setEditing]               = useState<Template | null>(null)
+  const [editName, setEditName]             = useState('')
+  const [editLangFiles, setEditLangFiles]   = useState<Partial<Record<Language, File>>>({})
   const [editLangPreviews, setEditLangPreviews] = useState<Partial<Record<Language, string>>>({})
+  const [editLangFields, setEditLangFields] = useState<Partial<Record<Language, TF[]>>>({})
   const [editPreviewLang, setEditPreviewLang] = useState<Language | null>(null)
+  const [saving, setSaving]                 = useState(false)
+
+  // Derive available languages (those with an uploaded image)
+  const uploadAvailableLangs = LANGUAGES.filter(l => langPreviews[l])
+  const editAvailableLangs   = LANGUAGES.filter(l => editLangPreviews[l])
 
   const handleLangImage = (
-    setter: React.Dispatch<React.SetStateAction<Partial<Record<Language, File>>>>,
+    fileSetter: React.Dispatch<React.SetStateAction<Partial<Record<Language, File>>>>,
     previewSetter: React.Dispatch<React.SetStateAction<Partial<Record<Language, string>>>>,
     prevPreviews: Partial<Record<Language, string>>,
     previewLangSetter: React.Dispatch<React.SetStateAction<Language | null>>,
+    fieldsSetter: React.Dispatch<React.SetStateAction<Partial<Record<Language, TF[]>>>>,
   ) => (lang: Language, file: File, url: string) => {
     if (prevPreviews[lang]) URL.revokeObjectURL(prevPreviews[lang]!)
-    setter(p => ({ ...p, [lang]: file }))
+    fileSetter(p => ({ ...p, [lang]: file }))
     previewSetter(p => ({ ...p, [lang]: url }))
     previewLangSetter(lang)
+    // Auto-initialise empty fields array for new language
+    fieldsSetter(p => p[lang] !== undefined ? p : { ...p, [lang]: [] })
   }
 
   const handleUpload = async () => {
@@ -202,10 +264,13 @@ export default function AdminPage() {
     }
     setUploading(true); setUploadErr(null)
     try {
-      await uploadTemplate(name.trim(), langFiles, fields)
-      setName(''); setFields([])
+      // Use first language's fields as the legacy fallback
+      const firstLang = uploadAvailableLangs[0]
+      const fallback = (firstLang && langFields[firstLang]) ?? []
+      await uploadTemplate(name.trim(), langFiles, langFields, fallback)
+      setName('')
       Object.values(langPreviews).forEach(u => u && URL.revokeObjectURL(u))
-      setLangFiles({}); setLangPreviews({}); setPreviewLang(null)
+      setLangFiles({}); setLangPreviews({}); setLangFields({}); setPreviewLang(null)
       await reload()
       setSnack('Template uploaded!')
     } catch { setUploadErr('Upload failed. Is the server running?') }
@@ -214,13 +279,16 @@ export default function AdminPage() {
 
   const openEdit = (t: Template) => {
     setEditing(t)
-    setEditFields(JSON.parse(JSON.stringify(t.fields)))
     setEditName(t.name)
     setEditLangFiles({})
-    // Populate previews from existing server URLs
     const previews: Partial<Record<Language, string>> = {}
-    for (const v of (t.variants || [])) previews[v.lang as Language] = v.imageUrl
+    const fields: Partial<Record<Language, TF[]>> = {}
+    for (const v of (t.variants || [])) {
+      previews[v.lang as Language] = v.imageUrl
+      fields[v.lang as Language] = v.fields ? JSON.parse(JSON.stringify(v.fields)) : []
+    }
     setEditLangPreviews(previews)
+    setEditLangFields(fields)
     setEditPreviewLang((t.variants?.[0]?.lang as Language) || null)
   }
 
@@ -228,20 +296,26 @@ export default function AdminPage() {
     if (!editing) return
     setSaving(true)
     try {
-      await updateTemplate(editing.id, { name: editName, fields: editFields, langImages: editLangFiles })
+      const firstLang = editAvailableLangs[0]
+      const fallback = (firstLang && editLangFields[firstLang]) ?? editing.fields
+      await updateTemplate(editing.id, {
+        name: editName,
+        fallbackFields: fallback,
+        langFields: editLangFields,
+        langImages: editLangFiles,
+      })
       await reload(); setEditing(null); setSnack('Template updated!')
     } catch { setSnack('Save failed.') }
     finally { setSaving(false) }
   }
 
-  // Derive preview URL
   const uploadPreviewUrl = previewLang
-    ? (langPreviews[previewLang] || Object.values(langPreviews)[0] || '')
-    : (Object.values(langPreviews)[0] || '')
+    ? (langPreviews[previewLang] ?? Object.values(langPreviews)[0] ?? '')
+    : (Object.values(langPreviews)[0] ?? '')
 
   const editPreviewUrl = editPreviewLang
-    ? (editLangPreviews[editPreviewLang] || Object.values(editLangPreviews)[0] || editing?.imageUrl || '')
-    : (Object.values(editLangPreviews)[0] || editing?.imageUrl || '')
+    ? (editLangPreviews[editPreviewLang] ?? Object.values(editLangPreviews)[0] ?? editing?.imageUrl ?? '')
+    : (Object.values(editLangPreviews)[0] ?? editing?.imageUrl ?? '')
 
   // ── Edit view ──
   if (editing) {
@@ -256,13 +330,14 @@ export default function AdminPage() {
             previewImageUrl={editPreviewUrl}
             templateName={editName}
             onNameChange={setEditName}
-            fields={editFields}
-            onFieldsChange={setEditFields}
+            langFields={editLangFields}
+            onLangFieldsChange={(lang, fields) => setEditLangFields(p => ({ ...p, [lang]: fields }))}
+            availableLangs={editAvailableLangs}
+            activePreviewLang={editPreviewLang}
+            onPreviewLang={setEditPreviewLang}
             langFiles={editLangFiles}
             langPreviews={editLangPreviews}
-            onLangImage={handleLangImage(setEditLangFiles, setEditLangPreviews, editLangPreviews, setEditPreviewLang)}
-            previewLang={editPreviewLang}
-            onPreviewLang={setEditPreviewLang}
+            onLangImage={handleLangImage(setEditLangFiles, setEditLangPreviews, editLangPreviews, setEditPreviewLang, setEditLangFields)}
             actions={
               <Stack direction="row" spacing={1.5}>
                 <Button variant="outlined" onClick={() => setEditing(null)} fullWidth={isMobile}>Cancel</Button>
@@ -285,10 +360,9 @@ export default function AdminPage() {
         Template Manager
       </Typography>
       <Typography variant="body2" color="text.secondary" mb={3}>
-        Upload invitation templates with per-language images and text field positions.
+        Upload invitation templates with per-language images and independent text field positions.
       </Typography>
 
-      {/* ── Upload section ── */}
       <Paper sx={{ mb: 4, border: '1px solid', borderColor: 'divider', overflow: 'hidden' }}>
         <Box sx={{ px: { xs: 2, md: 3 }, pt: { xs: 2, md: 3 }, pb: 1.5 }}>
           <Typography variant="h6" fontWeight={700}>Upload New Template</Typography>
@@ -299,13 +373,14 @@ export default function AdminPage() {
             previewImageUrl={uploadPreviewUrl}
             templateName={name}
             onNameChange={setName}
-            fields={fields}
-            onFieldsChange={setFields}
+            langFields={langFields}
+            onLangFieldsChange={(lang, fields) => setLangFields(p => ({ ...p, [lang]: fields }))}
+            availableLangs={uploadAvailableLangs}
+            activePreviewLang={previewLang}
+            onPreviewLang={setPreviewLang}
             langFiles={langFiles}
             langPreviews={langPreviews}
-            onLangImage={handleLangImage(setLangFiles, setLangPreviews, langPreviews, setPreviewLang)}
-            previewLang={previewLang}
-            onPreviewLang={setPreviewLang}
+            onLangImage={handleLangImage(setLangFiles, setLangPreviews, langPreviews, setPreviewLang, setLangFields)}
             error={uploadErr}
             actions={
               <Button variant="contained" size="large"
@@ -317,14 +392,13 @@ export default function AdminPage() {
           />
         ) : (
           <Box sx={{ p: { xs: 2, md: 3 } }}>
-            <LangImageUploader langFiles={langFiles} langPreviews={langPreviews}
-              onChange={handleLangImage(setLangFiles, setLangPreviews, langPreviews, setPreviewLang)} />
+            <LangImageUploader idPrefix="upload-img" langFiles={langFiles} langPreviews={langPreviews}
+              onChange={handleLangImage(setLangFiles, setLangPreviews, langPreviews, setPreviewLang, setLangFields)} />
             {uploadErr && <Alert severity="error" sx={{ mt: 2 }}>{uploadErr}</Alert>}
           </Box>
         )}
       </Paper>
 
-      {/* ── Saved templates ── */}
       <Typography variant="h6" fontWeight={700} gutterBottom>Saved Templates ({templates.length})</Typography>
       {listError && <Alert severity="error" sx={{ mb: 2 }}>{listError}</Alert>}
 
@@ -357,9 +431,6 @@ export default function AdminPage() {
                     {(t.variants || []).map(v => (
                       <Chip key={v.lang} label={`${FLAG[v.lang as Language]} ${v.lang}`} size="small" variant="outlined" />
                     ))}
-                    {(!t.variants || t.variants.length === 0) && (
-                      <Typography variant="caption" color="text.secondary">No language variants</Typography>
-                    )}
                   </Box>
                   <Typography variant="caption" color="text.secondary" display="block" mt={0.5}>
                     {new Date(t.createdAt).toLocaleDateString()}

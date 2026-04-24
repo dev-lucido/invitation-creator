@@ -1,3 +1,5 @@
+// src/components/LanguagePicker.tsx
+
 import { Box, Paper, Typography, ButtonBase } from '@mui/material'
 import { Language, LANGUAGES, Template } from '../types'
 
@@ -15,9 +17,16 @@ interface Props {
 
 export default function LanguagePicker({ template, selected, onSelect }: Props) {
   // Only show languages that have an image variant (or all if template has no variants yet)
-  const available: Language[] = template.variants && template.variants.length > 0
+  const seen = new Set<Language>()
+const available: Language[] = (
+  template.variants && template.variants.length > 0
     ? LANGUAGES.filter(l => template.variants.some(v => v.lang === l))
     : LANGUAGES
+).filter(l => {
+  if (seen.has(l)) return false
+  seen.add(l)
+  return true
+})
 
   return (
     <Box>
