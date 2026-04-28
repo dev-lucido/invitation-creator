@@ -16,7 +16,7 @@ import { useTemplates } from '../hooks/useTemplates'
 import FieldEditor from '../components/FieldEditor'
 import TemplatePreview from '../components/TemplatePreview'
 
-const FLAG: Record<Language, string> = { English: '🇬🇧', Sinhala: '🇱🇰', Tamil: '🇮🇳' }
+// const FLAG: Record<Language, string> = { English: '🇬🇧', Sinhala: '🇱🇰', Tamil: '🇮🇳' }
 
 function makeFakeTemplate(name: string, imageUrl: string, fields: TF[]): Template {
   return { id: '__preview__', name: name || 'Preview', filename: '', imageUrl, variants: [], fields, createdAt: '' }
@@ -46,7 +46,7 @@ function LangImageUploader({ langFiles, langPreviews, onChange, idPrefix = 'img'
         {LANGUAGES.map(lang => (
           <Grid item xs={12} sm={4} key={lang}>
             <Paper variant="outlined" sx={{ p: 1.5, textAlign: 'center' }}>
-              <Typography variant="caption" fontWeight={700} display="block" mb={1}>{FLAG[lang]} {lang}</Typography>
+              <Typography variant="caption" fontWeight={700} display="block" mb={1}>{lang}</Typography>
               {langPreviews[lang] ? (
                 <Box component="img" src={langPreviews[lang]} alt={lang}
                   sx={{ width: '100%', height: 80, objectFit: 'cover', borderRadius: 1, display: 'block', mb: 1 }} />
@@ -113,7 +113,7 @@ function LangFieldEditor({ availableLangs, langFields, onChange }: LangFieldEdit
         {availableLangs.map((lang, i) => (
           <Tab
             key={lang}
-            label={`${FLAG[lang]} ${lang}`}
+            label={`${lang}`}
             value={i}
             sx={{ minWidth: 100 }}
           />
@@ -177,7 +177,7 @@ function EditorPanel({
           </Typography>
           <Stack direction="row" spacing={0.5}>
             {availableLangs.map(l => (
-              <Chip key={l} label={`${FLAG[l]} ${l}`} size="small"
+              <Chip key={l} label={`${l}`} size="small"
                 onClick={() => onPreviewLang(l)}
                 color={activePreviewLang === l ? 'primary' : 'default'}
                 variant={activePreviewLang === l ? 'filled' : 'outlined'}
@@ -429,7 +429,7 @@ export default function AdminPage() {
                   <Typography fontWeight={700} noWrap title={t.name}>{t.name}</Typography>
                   <Box display="flex" gap={0.5} mt={0.5} flexWrap="wrap">
                     {(t.variants || []).map(v => (
-                      <Chip key={v.lang} label={`${FLAG[v.lang as Language]} ${v.lang}`} size="small" variant="outlined" />
+                      <Chip key={v.lang} label={`${v.lang}`} size="small" variant="outlined" />
                     ))}
                   </Box>
                   <Typography variant="caption" color="text.secondary" display="block" mt={0.5}>

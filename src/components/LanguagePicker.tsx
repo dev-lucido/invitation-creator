@@ -3,11 +3,11 @@
 import { Box, Paper, Typography, ButtonBase } from '@mui/material'
 import { Language, LANGUAGES, Template } from '../types'
 
-const FLAG: Record<Language, string> = {
-  English: '🇬🇧',
-  Sinhala: '🇱🇰',
-  Tamil:   '🇮🇳',
-}
+// const FLAG: Record<Language, string> = {
+//   English: '🇬🇧',
+//   Sinhala: '🇱🇰',
+//   Tamil:   '🇮🇳',
+// }
 
 interface Props {
   template: Template
@@ -70,7 +70,7 @@ const available: Language[] = (
                   },
                 }}
               >
-                <Typography fontSize={32} lineHeight={1}>{FLAG[lang]}</Typography>
+                {/* <Typography fontSize={32} lineHeight={1}>{FLAG[lang]}</Typography> */}
                 <Typography variant="body2" fontWeight={700}>{lang}</Typography>
               </Paper>
             </ButtonBase>

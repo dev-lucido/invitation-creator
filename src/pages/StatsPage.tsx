@@ -42,7 +42,7 @@ function timeAgo(iso: string | null) {
   return `${days}d ago`
 }
 
-const FLAG: Record<string, string> = { English: '🇬🇧', Sinhala: '🇱🇰', Tamil: '🇮🇳' }
+// const FLAG: Record<string, string> = { English: '🇬🇧', Sinhala: '🇱🇰', Tamil: '🇮🇳' }
 const EVENT_COLOR: Record<string, string> = {
   login: '#0084cb',
   login_failed: '#e94560',
@@ -125,7 +125,7 @@ function UserStatsTable({ stats }: { stats: UserStat[] }) {
                   {Object.entries(u.languages).length === 0
                     ? <Typography variant="caption" color="text.disabled">—</Typography>
                     : Object.entries(u.languages).map(([lang, count]) => (
-                      <Chip key={lang} label={`${FLAG[lang] || ''} ${lang} ×${count}`}
+                      <Chip key={lang} label={`${lang} ×${count}`}
                         size="small" variant="outlined" sx={{ fontSize: 11, height: 20 }} />
                     ))}
                 </Box>
@@ -193,7 +193,7 @@ function ActivityFeed({ events }: { events: ActivityEvent[] }) {
                   />
                   {e.language && (
                     <Typography variant="caption" color="text.secondary">
-                      {FLAG[e.language] || ''} {e.language}
+                      {e.language}
                     </Typography>
                   )}
                   {e.templateName && (
@@ -388,7 +388,7 @@ export default function StatsPage() {
                 Object.entries(stats.languageTotals)
                   .sort((a, b) => b[1] - a[1])
                   .map(([lang, count]) => (
-                    <BreakdownRow key={lang} label={`${FLAG[lang] || ''} ${lang}`} count={count} total={langTotal}
+                    <BreakdownRow key={lang} label={`${lang}`} count={count} total={langTotal}
                       color={lang === 'English' ? '#0084cb' : lang === 'Sinhala' ? '#e94560' : '#7b2ff7'} />
                   ))
               )}
