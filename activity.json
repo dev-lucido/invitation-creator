@@ -1,0 +1,45 @@
+[
+  {
+    "type": "login",
+    "username": "admin",
+    "userId": "usr_admin",
+    "role": "admin",
+    "timestamp": "2026-04-28T08:16:03.381Z",
+    "ip": "127.0.0.1",
+    "id": "act_1777364163382_052dn"
+  },
+  {
+    "type": "login",
+    "username": "admin",
+    "userId": "usr_admin",
+    "role": "admin",
+    "timestamp": "2026-04-28T08:16:33.432Z",
+    "ip": "127.0.0.1",
+    "id": "act_1777364193432_ji32b"
+  },
+  {
+    "type": "login_failed",
+    "username": "admin",
+    "timestamp": "2026-04-28T08:16:52.909Z",
+    "ip": "127.0.0.1",
+    "id": "act_1777364212909_aq2i1"
+  },
+  {
+    "type": "login",
+    "username": "admin",
+    "userId": "usr_admin",
+    "role": "admin",
+    "timestamp": "2026-04-28T08:16:56.812Z",
+    "ip": "127.0.0.1",
+    "id": "act_1777364216812_im25t"
+  },
+  {
+    "type": "login",
+    "username": "admin",
+    "userId": "usr_admin",
+    "role": "admin",
+    "timestamp": "2026-04-28T08:17:20.371Z",
+    "ip": "127.0.0.1",
+    "id": "act_1777364240371_qzbfw"
+  }
+]
