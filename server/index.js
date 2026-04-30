@@ -377,9 +377,12 @@ function requireAdmin(req, res, next) {
 }
 
 // ── Paths ──────────────────────────────────────────────────────────────────────
+// const DATA_DIR = IS_PROD
+//   ? "/tmp/invitation-data"
+//   : path.join(__dirname, "..", "public");
 const DATA_DIR = IS_PROD
-  ? "/tmp/invitation-data"
-  : path.join(__dirname, "..", "public");
+  ? (process.env.DATA_DIR || '/data')   // mount your volume at /data
+  : path.join(__dirname, '..', 'public')
 const TEMPLATES_DIR = path.join(DATA_DIR, "templates");
 const METADATA_FILE = path.join(DATA_DIR, "templates.json");
 const USERS_FILE = path.join(DATA_DIR, "users.json");
